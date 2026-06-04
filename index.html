@@ -197,6 +197,41 @@
     }
     .tag-chip-remove:hover { opacity: 1; }
 
+    /* Tag Autocomplete Suggestions */
+    .tag-suggest-wrap { position: relative; }
+    .tag-suggestions {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border: 1.5px solid var(--primary);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow);
+      z-index: 200;
+      max-height: 164px;
+      overflow-y: auto;
+    }
+    .tag-suggest-item {
+      padding: 7px 11px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.12s;
+    }
+    .tag-suggest-item:hover { background: var(--primary-light); }
+    .tag-suggest-key {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-left: auto;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      flex-shrink: 0;
+    }
+
     .tag-inline-input {
       border: none;
       outline: none;
@@ -398,7 +433,7 @@
     .preview-meta {
       font-size: 12px;
       color: var(--text-muted);
-      margin-top: -12px;
+      margin-top: 5px;
     }
 
     .preview-block-label {
@@ -616,11 +651,14 @@
 
         <div>
           <div class="field-label">重點方向（Tags）</div>
-          <div class="tags-field" id="tagsField" onclick="focusTagInput()">
-            <input class="tag-inline-input" type="text" id="tagInput"
-                   placeholder="輸入後按 Enter 或逗號新增">
+          <div class="tag-suggest-wrap">
+            <div class="tags-field" id="tagsField" onclick="focusTagInput()">
+              <input class="tag-inline-input" type="text" id="tagInput"
+                     placeholder="輸入後按 Enter 或逗號新增">
+            </div>
+            <div class="tag-suggestions" id="tagSuggestions" style="display:none"></div>
           </div>
-          <div class="field-hint">按 Enter 或逗號「,」新增標籤；Backspace 刪除最後一個</div>
+          <div class="field-hint">按 Enter 或「,」新增；Backspace 刪除最後一個；Tab 快速填入建議</div>
         </div>
 
         <div>
@@ -739,6 +777,33 @@
   let pendingDeleteId = null;
   let pendingDeleteTimer = null;
 
+  /* ── Tag Colors ── */
+  const TAG_COLORS = [
+    { bg: '#EEF0FF', color: '#4557E0' },
+    { bg: '#F3EEFF', color: '#7C3AED' },
+    { bg: '#FFF0F6', color: '#DB2777' },
+    { bg: '#FFF4EC', color: '#C05621' },
+    { bg: '#EDFAF1', color: '#15803D' },
+    { bg: '#ECFEFF', color: '#0E7490' },
+    { bg: '#FEFCE8', color: '#A16207' },
+    { bg: '#FFF5F5', color: '#C53030' },
+    { bg: '#F0FDF4', color: '#166534' },
+    { bg: '#FDF4FF', color: '#86198F' },
+  ];
+
+  function tagColorStyle(tag) {
+    let h = 0;
+    for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) & 0x7fffffff;
+    const c = TAG_COLORS[h % TAG_COLORS.length];
+    return `background:${c.bg};color:${c.color}`;
+  }
+
+  function getAllExistingTags() {
+    const set = new Set();
+    prompts.forEach(p => p.tags.forEach(t => set.add(t)));
+    return [...set].sort();
+  }
+
   /* ── Bootstrap ── */
   (function init() {
     try {
@@ -748,6 +813,9 @@
 
     document.getElementById('tagInput').addEventListener('keydown', onTagKeyDown);
     document.getElementById('tagInput').addEventListener('input', onTagInput);
+    document.getElementById('tagInput').addEventListener('blur', () => {
+      setTimeout(hideSuggestions, 150);
+    });
     document.getElementById('fName').addEventListener('keydown', e => {
       if (e.key === 'Enter') document.getElementById('fContent').focus();
     });
@@ -828,9 +896,19 @@
 
   function onTagKeyDown(e) {
     const input = document.getElementById('tagInput');
-    if (e.key === 'Enter') {
+    if (e.key === 'Tab') {
+      const suggestions = getTagSuggestions(input.value);
+      if (suggestions.length > 0) {
+        e.preventDefault();
+        input.value = suggestions[0];
+        hideSuggestions();
+      }
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       commitTag(input.value);
+      hideSuggestions();
+    } else if (e.key === 'Escape') {
+      hideSuggestions();
     } else if (e.key === 'Backspace' && input.value === '' && formTags.length > 0) {
       formTags.pop();
       renderFormTags();
@@ -841,7 +919,43 @@
     const input = document.getElementById('tagInput');
     if (input.value.endsWith(',')) {
       commitTag(input.value.slice(0, -1));
+      hideSuggestions();
+      return;
     }
+    const val = input.value.trim();
+    if (val.length >= 1) showSuggestions(val);
+    else hideSuggestions();
+  }
+
+  function getTagSuggestions(input) {
+    const val = input.trim().toLowerCase();
+    if (!val) return [];
+    return getAllExistingTags().filter(t =>
+      t.toLowerCase().startsWith(val) && !formTags.includes(t)
+    );
+  }
+
+  function showSuggestions(val) {
+    const list = document.getElementById('tagSuggestions');
+    const items = getTagSuggestions(val);
+    if (!items.length) { hideSuggestions(); return; }
+    list.innerHTML = items.map(t =>
+      `<div class="tag-suggest-item" onmousedown="pickSuggestion('${esc(t)}')" data-tag="${esc(t)}">
+        <span style="${tagColorStyle(t)};padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600">${esc(t)}</span>
+        <span class="tag-suggest-key">Tab</span>
+      </div>`
+    ).join('');
+    list.style.display = '';
+  }
+
+  function hideSuggestions() {
+    document.getElementById('tagSuggestions').style.display = 'none';
+  }
+
+  function pickSuggestion(tag) {
+    commitTag(tag);
+    hideSuggestions();
+    document.getElementById('tagInput').focus();
   }
 
   function commitTag(raw) {
@@ -866,6 +980,7 @@
     formTags.forEach((tag, i) => {
       const chip = document.createElement('span');
       chip.className = 'tag-chip';
+      chip.setAttribute('style', tagColorStyle(tag));
       chip.innerHTML = `${esc(tag)}<span class="tag-chip-remove" onclick="removeFormTag(${i})">×</span>`;
       field.insertBefore(chip, input);
     });
@@ -975,7 +1090,7 @@
       const isPending = p.id === pendingDeleteId;
 
       const tagsHtml = p.tags.length
-        ? p.tags.map(t => `<span class="card-tag">${esc(t)}</span>`).join('')
+        ? p.tags.map(t => `<span class="card-tag" style="${tagColorStyle(t)}">${esc(t)}</span>`).join('')
         : '';
 
       const deleteBarHtml = isPending
@@ -1033,7 +1148,7 @@
 
     const tagsList = document.getElementById('pvTags');
     if (p.tags.length) {
-      tagsList.innerHTML = p.tags.map(t => `<span class="preview-tag">${esc(t)}</span>`).join('');
+      tagsList.innerHTML = p.tags.map(t => `<span class="preview-tag" style="${tagColorStyle(t)}">${esc(t)}</span>`).join('');
     } else {
       tagsList.innerHTML = `<span class="preview-no-tags">（未設定標籤）</span>`;
     }
