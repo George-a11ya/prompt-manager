@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prompt 管理器</title>
+  <style>
+    :root {
+      --primary: #5B6EF5;
+      --primary-dark: #4557E0;
+      --primary-light: #EEF0FF;
+      --success: #2ECC71;
+      --danger: #E53E3E;
+      --danger-light: #FFF5F5;
+      --bg: #F2F4F8;
+      --surface: #FFFFFF;
+      --surface-2: #F8F9FB;
+      --border: #E4E8EF;
+      --text: #1C2230;
+      --text-muted: #7A869A;
+      --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+      --shadow: 0 4px 16px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.14);
+      --radius: 14px;
+      --radius-sm: 8px;
+      --radius-xs: 6px;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC',
+                   'Microsoft JhengHei', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      flex-shrink: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .app-header-logo {
+      font-size: 20px;
+    }
+    .app-header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .app-header-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+
+    /* ── Layout ── */
+    .app-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── Left Panel ── */
+    .left-panel {
+      width: 360px;
+      min-width: 300px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Create / Edit Section */
+    .form-section {
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+
+    .toggle-btn {
+      width: 100%;
+      height: 40px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.18s;
+    }
+    .toggle-btn:hover { background: var(--primary-dark); }
+    .toggle-btn.open { background: #E8EAFF; color: var(--primary); }
+    .toggle-btn.open:hover { background: #DDE0FF; }
+
+    .form-body {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .form-body.visible { display: flex; }
+
+    .form-mode-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-block;
+      width: fit-content;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 5px;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 8px 11px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.18s;
+    }
+    .field-input:focus { border-color: var(--primary); }
+
+    .field-textarea {
+      resize: vertical;
+      min-height: 88px;
+      line-height: 1.6;
+    }
+
+    /* Tags Input */
+    .tags-field {
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      min-height: 40px;
+      cursor: text;
+      transition: border-color 0.18s;
+      background: var(--surface);
+    }
+    .tags-field:focus-within { border-color: var(--primary); }
+
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      user-select: none;
+    }
+    .tag-chip-remove {
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+    .tag-chip-remove:hover { opacity: 1; }
+
+    .tag-inline-input {
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--text);
+      background: transparent;
+      flex: 1;
+      min-width: 90px;
+    }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 0 16px;
+      height: 36px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-primary { flex: 1; background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1.5px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn-sm { height: 30px; padding: 0 12px; font-size: 12px; }
+    .btn-danger-ghost { background: transparent; color: var(--danger); border: 1.5px solid #FEB2B2; }
+    .btn-danger-ghost:hover { background: var(--danger-light); }
+
+    /* Prompt List */
+    .list-section {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .list-empty {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 40px 16px;
+      line-height: 1.8;
+    }
+    .list-empty-icon { font-size: 36px; display: block; margin-bottom: 8px; opacity: 0.4; }
+
+    .prompt-card {
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 13px;
+      cursor: pointer;
+      transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+      background: var(--surface);
+      position: relative;
+    }
+    .prompt-card:hover { border-color: #C7CDFF; box-shadow: var(--shadow-sm); }
+    .prompt-card.selected {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(91,110,245,0.1);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-name {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.4;
+      flex: 1;
+      word-break: break-word;
+    }
+    .card-actions {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      font-size: 13px;
+      background: transparent;
+      transition: background 0.15s;
+    }
+    .icon-btn:hover { background: rgba(0,0,0,0.07); }
+    .icon-btn.del:hover { background: var(--danger-light); }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 7px;
+    }
+    .card-tag {
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .prompt-card.selected .card-tag { background: rgba(255,255,255,0.7); }
+
+    .card-date {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .delete-confirm-bar {
+      margin-top: 10px;
+      padding: 9px 11px;
+      background: var(--danger-light);
+      border: 1px solid #FEB2B2;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--danger);
+    }
+
+    /* IO Row */
+    .io-row {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      gap: 8px;
+    }
+    .io-row .btn { flex: 1; }
+
+    /* ── Right Panel ── */
+    .right-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .preview-empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .preview-empty-icon { font-size: 52px; opacity: 0.25; }
+
+    .preview-area {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      padding: 24px 28px;
+      overflow-y: auto;
+      gap: 20px;
+    }
+    .preview-area.visible { display: flex; }
+
+    .preview-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      line-height: 1.3;
+    }
+
+    .preview-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: -12px;
+    }
+
+    .preview-block-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .preview-tags-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    .preview-tag {
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 5px 14px;
+      border-radius: 20px;
+    }
+    .preview-no-tags {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .preview-content-box {
+      background: var(--surface-2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      font-size: 14px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      word-break: break-word;
+      flex: 1;
+    }
+
+    .copy-btn {
+      flex-shrink: 0;
+      height: 50px;
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      transition: background 0.18s, transform 0.1s;
+    }
+    .copy-btn:hover { background: var(--primary-dark); }
+    .copy-btn:active { transform: scale(0.99); }
+    .copy-btn.copied { background: var(--success); }
+
+    /* ── Modals ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(20,25,40,0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 900;
+      padding: 20px;
+      backdrop-filter: blur(2px);
+    }
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 480px;
+      padding: 24px;
+      box-shadow: var(--shadow-lg);
+    }
+    .modal-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .modal-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      line-height: 1.6;
+    }
+    .modal-textarea {
+      width: 100%;
+      height: 180px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 13px;
+      font-size: 12.5px;
+      font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      color: var(--text);
+      resize: none;
+      outline: none;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .modal-textarea:focus { border-color: var(--primary); }
+
+    .import-mode-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .modal-actions .btn { flex: 1; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1C2230;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 13.5px;
+      font-weight: 500;
+      z-index: 9999;
+      white-space: nowrap;
+      pointer-events: none;
+      transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #C0C8D8; }
+
+    /* ── Mobile ── */
+    @media (max-width: 700px) {
+      body { overflow: auto; height: auto; }
+
+      .app-body {
+        flex-direction: column;
+        overflow: visible;
+        min-height: 0;
+      }
+      .left-panel {
+        width: 100%;
+        min-width: unset;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        overflow: visible;
+        flex-shrink: 0;
+      }
+      .list-section { max-height: 55vh; overflow-y: auto; }
+
+      .right-panel { min-height: 300px; overflow: visible; }
+      .preview-area { padding: 18px 16px; }
+      .preview-title { font-size: 18px; }
+
+      .modal { max-width: 100%; }
+
+      .app-header-sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="app-header">
+  <span class="app-header-logo">📝</span>
+  <h1>Prompt 管理器</h1>
+  <span class="app-header-sub">— 選擇並複製 Prompt 至 AI 工具</span>
+</header>
+
+<!-- ── Body ── -->
+<div class="app-body">
+
+  <!-- Left Panel -->
+  <div class="left-panel">
+
+    <!-- Form Section -->
+    <div class="form-section">
+      <button class="toggle-btn" id="toggleBtn" onclick="toggleForm()">
+        <span id="toggleIcon">＋</span>
+        <span id="toggleLabel">新建 Prompt</span>
+      </button>
+
+      <div class="form-body" id="formBody">
+        <div id="formModeLabel" class="form-mode-label" style="display:none">✏️ 編輯模式</div>
+
+        <div>
+          <div class="field-label">名稱</div>
+          <input class="field-input" type="text" id="fName" placeholder="為這個 Prompt 取個名稱">
+        </div>
+
+        <div>
+          <div class="field-label">重點方向（Tags）</div>
+          <div class="tags-field" id="tagsField" onclick="focusTagInput()">
+            <input class="tag-inline-input" type="text" id="tagInput"
+                   placeholder="輸入後按 Enter 或逗號新增">
+          </div>
+          <div class="field-hint">按 Enter 或逗號「,」新增標籤；Backspace 刪除最後一個</div>
+        </div>
+
+        <div>
+          <div class="field-label">Prompt 內容</div>
+          <textarea class="field-input field-textarea" id="fContent"
+                    placeholder="輸入完整的 Prompt 內容…"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="savePrompt()">
+            <span>💾</span><span id="saveBtnText">儲存</span>
+          </button>
+          <button class="btn btn-ghost" onclick="cancelForm()">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- List Section -->
+    <div class="list-section" id="listSection">
+      <div class="list-empty" id="listEmpty">
+        <span class="list-empty-icon">🗂️</span>
+        尚無 Prompt<br>點上方「新建 Prompt」開始建立
+      </div>
+    </div>
+
+    <!-- IO Row -->
+    <div class="io-row">
+      <button class="btn btn-ghost btn-sm" onclick="openExport()">📤 匯出</button>
+      <button class="btn btn-ghost btn-sm" onclick="openImport()">📥 匯入</button>
+    </div>
+
+  </div>
+
+  <!-- Right Panel -->
+  <div class="right-panel" id="rightPanel">
+
+    <div class="preview-empty" id="previewEmpty">
+      <span class="preview-empty-icon">💡</span>
+      從左側選擇一個 Prompt 查看內容
+    </div>
+
+    <div class="preview-area" id="previewArea">
+      <div>
+        <div class="preview-title" id="pvTitle"></div>
+        <div class="preview-meta" id="pvMeta"></div>
+      </div>
+
+      <div>
+        <div class="preview-block-label">重點方向</div>
+        <div class="preview-tags-list" id="pvTags"></div>
+      </div>
+
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-height:0">
+        <div class="preview-block-label">Prompt 內容</div>
+        <div class="preview-content-box" id="pvContent"></div>
+      </div>
+
+      <button class="copy-btn" id="copyBtn" onclick="copyToClipboard()">
+        <span>📋</span><span id="copyBtnText">複製到剪貼簿</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Export Modal ── -->
+<div class="overlay" id="exportOverlay" onclick="closeOverlay('exportOverlay')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">📤 匯出 Prompt</div>
+    <div class="modal-desc">
+      複製下方文字，在其他裝置開啟本工具後點「匯入」貼上，即可同步所有 Prompt。
+    </div>
+    <textarea class="modal-textarea" id="exportText" readonly
+              onclick="this.select()"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="copyExportText()">📋 複製文字</button>
+      <button class="btn btn-ghost" onclick="downloadExport()">⬇️ 下載 JSON</button>
+      <button class="btn btn-ghost" onclick="closeOverlay('exportOverlay')">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Import Modal ── -->
+<div class="overlay" id="importOverlay" onclick="closeOverlay('importOverlay')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">📥 匯入 Prompt</div>
+    <div class="modal-desc">貼入從其他裝置匯出的文字：</div>
+    <div class="import-mode-row">
+      <label class="radio-item">
+        <input type="radio" name="importMode" value="merge" checked>
+        合併（保留現有，新增不重複的）
+      </label>
+      <label class="radio-item">
+        <input type="radio" name="importMode" value="replace">
+        全部取代
+      </label>
+    </div>
+    <textarea class="modal-textarea" id="importText"
+              placeholder="貼上從其他裝置匯出的文字…"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="doImport()">匯入</button>
+      <button class="btn btn-ghost" onclick="closeOverlay('importOverlay')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+  /* ── State ── */
+  let prompts = [];
+  let selectedId = null;
+  let editingId = null;
+  let formTags = [];
+  let pendingDeleteId = null;
+  let pendingDeleteTimer = null;
+
+  /* ── Bootstrap ── */
+  (function init() {
+    try {
+      const raw = localStorage.getItem('prompt-manager-v1');
+      if (raw) prompts = JSON.parse(raw);
+    } catch (_) { prompts = []; }
+
+    document.getElementById('tagInput').addEventListener('keydown', onTagKeyDown);
+    document.getElementById('tagInput').addEventListener('input', onTagInput);
+    document.getElementById('fName').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('fContent').focus();
+    });
+
+    renderList();
+  })();
+
+  function persist() {
+    localStorage.setItem('prompt-manager-v1', JSON.stringify(prompts));
+  }
+
+  /* ── Form Toggle ── */
+  function toggleForm() {
+    const body = document.getElementById('formBody');
+    const open = body.classList.contains('visible');
+    if (open) {
+      closeForm();
+    } else {
+      openFormCreate();
+    }
+  }
+
+  function openFormCreate() {
+    editingId = null;
+    clearForm();
+    const body = document.getElementById('formBody');
+    body.classList.add('visible');
+    document.getElementById('toggleBtn').classList.add('open');
+    document.getElementById('toggleIcon').textContent = '✕';
+    document.getElementById('toggleLabel').textContent = '收起';
+    document.getElementById('formModeLabel').style.display = 'none';
+    document.getElementById('saveBtnText').textContent = '儲存';
+    document.getElementById('fName').focus();
+  }
+
+  function openFormEdit(p) {
+    editingId = p.id;
+    document.getElementById('fName').value = p.name;
+    document.getElementById('fContent').value = p.content;
+    formTags = [...p.tags];
+
+    const body = document.getElementById('formBody');
+    body.classList.add('visible');
+    document.getElementById('toggleBtn').classList.add('open');
+    document.getElementById('toggleIcon').textContent = '✕';
+    document.getElementById('toggleLabel').textContent = '收起';
+    document.getElementById('formModeLabel').style.display = 'inline-block';
+    document.getElementById('saveBtnText').textContent = '更新';
+    renderFormTags();
+    body.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('fName').focus();
+  }
+
+  function cancelForm() {
+    closeForm();
+  }
+
+  function closeForm() {
+    editingId = null;
+    clearForm();
+    document.getElementById('formBody').classList.remove('visible');
+    document.getElementById('toggleBtn').classList.remove('open');
+    document.getElementById('toggleIcon').textContent = '＋';
+    document.getElementById('toggleLabel').textContent = '新建 Prompt';
+  }
+
+  function clearForm() {
+    document.getElementById('fName').value = '';
+    document.getElementById('fContent').value = '';
+    formTags = [];
+    renderFormTags();
+  }
+
+  /* ── Tag Input ── */
+  function focusTagInput() {
+    document.getElementById('tagInput').focus();
+  }
+
+  function onTagKeyDown(e) {
+    const input = document.getElementById('tagInput');
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitTag(input.value);
+    } else if (e.key === 'Backspace' && input.value === '' && formTags.length > 0) {
+      formTags.pop();
+      renderFormTags();
+    }
+  }
+
+  function onTagInput(e) {
+    const input = document.getElementById('tagInput');
+    if (input.value.endsWith(',')) {
+      commitTag(input.value.slice(0, -1));
+    }
+  }
+
+  function commitTag(raw) {
+    const val = raw.trim();
+    const input = document.getElementById('tagInput');
+    if (val && !formTags.includes(val)) {
+      formTags.push(val);
+      renderFormTags();
+    }
+    input.value = '';
+  }
+
+  function removeFormTag(i) {
+    formTags.splice(i, 1);
+    renderFormTags();
+  }
+
+  function renderFormTags() {
+    const field = document.getElementById('tagsField');
+    const input = document.getElementById('tagInput');
+    field.querySelectorAll('.tag-chip').forEach(el => el.remove());
+    formTags.forEach((tag, i) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `${esc(tag)}<span class="tag-chip-remove" onclick="removeFormTag(${i})">×</span>`;
+      field.insertBefore(chip, input);
+    });
+  }
+
+  /* ── Save / Update ── */
+  function savePrompt() {
+    const name = document.getElementById('fName').value.trim();
+    const content = document.getElementById('fContent').value.trim();
+
+    if (!name) { toast('請輸入 Prompt 名稱'); document.getElementById('fName').focus(); return; }
+    if (!content) { toast('請輸入 Prompt 內容'); document.getElementById('fContent').focus(); return; }
+
+    const now = new Date().toISOString();
+
+    if (editingId) {
+      const idx = prompts.findIndex(p => p.id === editingId);
+      if (idx !== -1) {
+        prompts[idx] = { ...prompts[idx], name, tags: [...formTags], content, updatedAt: now };
+        if (selectedId === editingId) renderPreview(prompts[idx]);
+        toast('已更新');
+      }
+    } else {
+      const p = {
+        id: crypto.randomUUID(),
+        name,
+        tags: [...formTags],
+        content,
+        createdAt: now,
+        updatedAt: now
+      };
+      prompts.unshift(p);
+      toast('Prompt 已新增');
+    }
+
+    persist();
+    renderList();
+    closeForm();
+  }
+
+  /* ── Delete ── */
+  function startDelete(id, e) {
+    e.stopPropagation();
+    if (pendingDeleteId === id) return; // already waiting
+    clearDeletePending();
+    pendingDeleteId = id;
+    renderList();
+    pendingDeleteTimer = setTimeout(() => {
+      pendingDeleteId = null;
+      renderList();
+    }, 4000);
+  }
+
+  function confirmDelete(id, e) {
+    e.stopPropagation();
+    clearDeletePending();
+    prompts = prompts.filter(p => p.id !== id);
+    if (selectedId === id) { selectedId = null; showEmpty(); }
+    persist();
+    renderList();
+    toast('已刪除');
+  }
+
+  function clearDeletePending() {
+    clearTimeout(pendingDeleteTimer);
+    pendingDeleteId = null;
+  }
+
+  /* ── Select ── */
+  function selectPrompt(id) {
+    if (pendingDeleteId) { clearDeletePending(); renderList(); return; }
+    selectedId = id;
+    const p = prompts.find(x => x.id === id);
+    if (p) renderPreview(p);
+    renderList();
+    // On mobile, scroll preview into view
+    if (window.innerWidth <= 700) {
+      document.getElementById('rightPanel').scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  /* ── Render List ── */
+  function renderList() {
+    const section = document.getElementById('listSection');
+    const empty = document.getElementById('listEmpty');
+
+    if (prompts.length === 0) {
+      empty.style.display = '';
+      section.querySelectorAll('.prompt-card').forEach(el => el.remove());
+      return;
+    }
+    empty.style.display = 'none';
+
+    const sorted = [...prompts].sort((a, b) =>
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    // Rebuild list
+    const existing = new Map(
+      [...section.querySelectorAll('.prompt-card')].map(el => [el.dataset.id, el])
+    );
+    const ids = new Set(sorted.map(p => p.id));
+    existing.forEach((el, id) => { if (!ids.has(id)) el.remove(); });
+
+    sorted.forEach((p, i) => {
+      const isSelected = p.id === selectedId;
+      const isPending = p.id === pendingDeleteId;
+
+      const tagsHtml = p.tags.length
+        ? p.tags.map(t => `<span class="card-tag">${esc(t)}</span>`).join('')
+        : '';
+
+      const deleteBarHtml = isPending
+        ? `<div class="delete-confirm-bar" onclick="event.stopPropagation()">
+             確定刪除「${esc(p.name)}」？
+             <button class="btn btn-danger-ghost btn-sm" onclick="confirmDelete('${p.id}',event)">確認刪除</button>
+           </div>`
+        : '';
+
+      const html = `
+        <div class="card-header">
+          <div class="card-name">${esc(p.name)}</div>
+          <div class="card-actions">
+            <button class="icon-btn" title="編輯" onclick="editCard('${p.id}',event)">✏️</button>
+            <button class="icon-btn del" title="刪除" onclick="startDelete('${p.id}',event)">${isPending ? '⚠️' : '🗑️'}</button>
+          </div>
+        </div>
+        ${tagsHtml ? `<div class="card-tags">${tagsHtml}</div>` : ''}
+        <div class="card-date">${fmtDate(p.createdAt)}</div>
+        ${deleteBarHtml}
+      `;
+
+      let el = existing.get(p.id);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'prompt-card';
+        el.dataset.id = p.id;
+        el.onclick = () => selectPrompt(p.id);
+        section.appendChild(el);
+      }
+      el.innerHTML = html;
+      el.className = 'prompt-card' + (isSelected ? ' selected' : '');
+
+      // Re-insert in sorted order
+      const ref = section.children[i + 1]; // +1 because of #listEmpty
+      if (ref !== el) section.insertBefore(el, ref || null);
+    });
+  }
+
+  function editCard(id, e) {
+    e.stopPropagation();
+    const p = prompts.find(x => x.id === id);
+    if (p) openFormEdit(p);
+  }
+
+  /* ── Render Preview ── */
+  function renderPreview(p) {
+    document.getElementById('previewEmpty').style.display = 'none';
+    const area = document.getElementById('previewArea');
+    area.classList.add('visible');
+
+    document.getElementById('pvTitle').textContent = p.name;
+    document.getElementById('pvMeta').textContent =
+      `建立：${fmtDate(p.createdAt)}　　最後修改：${fmtDate(p.updatedAt)}`;
+
+    const tagsList = document.getElementById('pvTags');
+    if (p.tags.length) {
+      tagsList.innerHTML = p.tags.map(t => `<span class="preview-tag">${esc(t)}</span>`).join('');
+    } else {
+      tagsList.innerHTML = `<span class="preview-no-tags">（未設定標籤）</span>`;
+    }
+
+    document.getElementById('pvContent').textContent = p.content;
+
+    const btn = document.getElementById('copyBtn');
+    btn.classList.remove('copied');
+    document.getElementById('copyBtnText').textContent = '複製到剪貼簿';
+  }
+
+  function showEmpty() {
+    document.getElementById('previewEmpty').style.display = '';
+    document.getElementById('previewArea').classList.remove('visible');
+  }
+
+  /* ── Copy ── */
+  function copyToClipboard() {
+    const p = prompts.find(x => x.id === selectedId);
+    if (!p) return;
+
+    const doFallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = p.content;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      markCopied();
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(p.content).then(markCopied).catch(doFallback);
+    } else {
+      doFallback();
+    }
+  }
+
+  function markCopied() {
+    const btn = document.getElementById('copyBtn');
+    btn.classList.add('copied');
+    document.getElementById('copyBtnText').textContent = '已複製 ✓';
+    toast('已複製到剪貼簿');
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      document.getElementById('copyBtnText').textContent = '複製到剪貼簿';
+    }, 2200);
+  }
+
+  /* ── Export ── */
+  function openExport() {
+    document.getElementById('exportText').value = JSON.stringify(prompts, null, 2);
+    document.getElementById('exportOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('exportText').select(), 80);
+  }
+
+  function copyExportText() {
+    const text = document.getElementById('exportText').value;
+    navigator.clipboard.writeText(text)
+      .then(() => toast('匯出文字已複製'))
+      .catch(() => {
+        document.getElementById('exportText').select();
+        document.execCommand('copy');
+        toast('匯出文字已複製');
+      });
+  }
+
+  function downloadExport() {
+    const text = JSON.stringify(prompts, null, 2);
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompts_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('JSON 檔案已下載');
+  }
+
+  /* ── Import ── */
+  function openImport() {
+    document.getElementById('importText').value = '';
+    document.getElementById('importOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('importText').focus(), 80);
+  }
+
+  function doImport() {
+    const text = document.getElementById('importText').value.trim();
+    if (!text) { toast('請貼上匯出的文字'); return; }
+
+    let imported;
+    try { imported = JSON.parse(text); } catch (_) {
+      toast('格式錯誤，請確認是否為正確的匯出文字');
+      return;
+    }
+    if (!Array.isArray(imported)) { toast('格式錯誤：應為陣列'); return; }
+
+    const mode = document.querySelector('input[name="importMode"]:checked').value;
+
+    if (mode === 'replace') {
+      prompts = imported;
+      selectedId = null;
+      showEmpty();
+      toast(`已匯入 ${imported.length} 個 Prompt（全部取代）`);
+    } else {
+      const existingIds = new Set(prompts.map(p => p.id));
+      const newOnes = imported.filter(p => p.id && !existingIds.has(p.id));
+      prompts = [...prompts, ...newOnes];
+      toast(`已合併匯入 ${newOnes.length} 個新 Prompt`);
+    }
+
+    persist();
+    renderList();
+    closeOverlay('importOverlay');
+  }
+
+  /* ── Overlay ── */
+  function closeOverlay(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  /* ── Toast ── */
+  let toastTimer;
+  function toast(msg) {
+    clearTimeout(toastTimer);
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  /* ── Utils ── */
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ` +
+           `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+</script>
+</body>
+</html>
